@@ -19,6 +19,11 @@ DiskActivityMonitor::~DiskActivityMonitor()
     }
 }
 
+double DiskActivityMonitor::GetCurrentActivity() const
+{
+    return diskActivity;
+}
+
 // Initializes the disk activity monitor by setting up a PDH query and adding a counter.
 // - Opens a new PDH query using `PdhOpenQuery`. If this fails, the function returns `false`.
 // - Adds a counter to monitor the total disk bytes per second using `PdhAddCounter`. If this fails, the function returns `false`.

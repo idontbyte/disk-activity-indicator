@@ -11,7 +11,7 @@ void PlayBeepSoundAsync();
 void PlayBeepSound();
 
 // Generate and play a single tone asynchronously
-void GenerateToneAndPlay(double frequency, int durationMs);
+void GenerateToneAndPlay(double baseFrequency, double diskActivity, double maxActivity, int durationMs);
 
 // waveOut callback for asynchronous playback
 void CALLBACK waveOutCallback(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2);

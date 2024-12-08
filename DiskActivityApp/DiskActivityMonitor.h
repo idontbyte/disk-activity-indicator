@@ -8,6 +8,7 @@ class DiskActivityMonitor
 public:
 	DiskActivityMonitor();
 	~DiskActivityMonitor();
+	double GetCurrentActivity() const;
 	bool Initialize();
 	bool Update();
 	bool IsActivityAboveThreshold() const;

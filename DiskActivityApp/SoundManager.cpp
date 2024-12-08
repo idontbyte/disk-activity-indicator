@@ -8,6 +8,7 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+#include "DiskActivityMonitor.h"
 
 #pragma comment(lib, "winmm.lib")
 
@@ -32,47 +33,78 @@ void PlayBeepSoundAsync()
 
 void PlayBeepSound()
 {
+    extern DiskActivityMonitor monitor; // Ensure access to the monitor
+    double maxActivity = 10000000;      // Define a maximum activity level for scaling
+
     for (int i = 0; i < 10; ++i)
     {
-        int frequency = 200 + (rand() % 800);
+        monitor.Update(); // Update the monitor to get the latest activity
+        double diskActivity = monitor.GetCurrentActivity();
+
         int duration = 100 + (rand() % 200);
-
-        wchar_t buf[100];
-        swprintf_s(buf, L"Playing tone: Frequency=%d, Duration=%d\n", frequency, duration);
-        OutputDebugString(buf);
-
-        GenerateToneAndPlay(700.0, 150); // 150ms burst at ~700 Hz
+        GenerateToneAndPlay(400.0, diskActivity, maxActivity, duration); // Base frequency 400 Hz
 
         // Add a delay between tones to make them distinct
         Sleep(50);
     }
 }
 
-void GenerateToneAndPlay(double baseFrequency, int durationMs)
+
+double GenerateSafeFrequency(double baseFreq, double diskActivity, double maxActivity)
 {
-    const int sampleRate = 44100; // Samples per second
-    const int amplitude = 3000;   // Volume level
+    // Scale frequency with activity, but less aggressively
+    double frequency = baseFreq + (diskActivity / maxActivity) * 10.0; 
+
+    // Ensure a lower bound to avoid too-low pitch and potential division by zero
+    if (frequency < 5.0) frequency = 5.0; // at least 100 Hz
+
+    // Ensure upper bound to avoid extremely high pitch
+    if (frequency > 1000.0) frequency = 1000.0;
+
+    return frequency;
+}
+
+void GenerateToneAndPlay(double baseFrequency, double diskActivity, double maxActivity, int durationMs)
+{
+    if (durationMs <= 0) durationMs = 50;
+    const int sampleRate = 44100;
+    const int amplitude = 3000;
     const int numSamples = (sampleRate * durationMs) / 1000;
+
+    if (numSamples <= 0) return;
 
     short* waveData = new short[numSamples];
 
-    // Generate waveform with randomized bursts, noise, and silence
+    double frequency = GenerateSafeFrequency(baseFrequency, diskActivity, maxActivity);
+
     for (int i = 0; i < numSamples; ++i)
     {
-        // Add random gaps (silence)
-        if (rand() % 20 < 2) // ~10% chance of silence
-        {
-            waveData[i] = 0;
-            continue;
+        // Smaller variation range: ±5 Hz instead of ±10
+        double variedFrequency = frequency + ((rand() % 10) - 5);
+        if (variedFrequency < 100.0) variedFrequency = 100.0;
+        if (variedFrequency > 2000.0) variedFrequency = 2000.0;
+
+        double periodDouble = (double)sampleRate / variedFrequency;
+        if (periodDouble < 1.0) periodDouble = 1.0;
+        int period = (int)periodDouble;
+        if (period <= 0) period = 1;
+
+        double saw = ((double)(i % period) / period) * 2.0 - 1.0;
+        double baseWave = amplitude * saw * 0.5;
+
+        double subtleNoise = ((rand() % 200) - 100) * 0.05;
+        double sampleValue = baseWave + subtleNoise;
+
+        if ((rand() % 50) == 0) {
+            sampleValue *= 0.7;
         }
 
-        // Vary frequency slightly for a dynamic pitch
-        double variedFrequency = baseFrequency + ((rand() % 100) - 50); // +/-50 Hz variation
+        // Clamp values before bit-crushing
+        if (sampleValue > 32767.0) sampleValue = 32767.0;
+        if (sampleValue < -32768.0) sampleValue = -32768.0;
 
-        // Generate a noisy wave
-        double baseWave = amplitude * sin((2.0 * M_PI * variedFrequency * i) / sampleRate);
-        double noise = (rand() % (amplitude * 2)) - amplitude; // Random noise
-        waveData[i] = static_cast<short>((baseWave * 0.4) + (noise * 0.6)); // Blend sine wave and noise
+        int sampleInt = (int)sampleValue & 0xFFF0;
+        waveData[i] = (short)sampleInt;
     }
 
     WAVEFORMATEX waveFormat = {};
@@ -96,10 +128,8 @@ void GenerateToneAndPlay(double baseFrequency, int durationMs)
         waveOutPrepareHeader(hWaveOut, &waveHeader, sizeof(WAVEHDR));
         waveOutWrite(hWaveOut, &waveHeader, sizeof(WAVEHDR));
 
-        // Wait for playback to finish
         waveOutReset(hWaveOut);
 
-        // Clean up
         waveOutUnprepareHeader(hWaveOut, &waveHeader, sizeof(WAVEHDR));
         waveOutClose(hWaveOut);
         delete[] waveData;
@@ -109,7 +139,6 @@ void GenerateToneAndPlay(double baseFrequency, int durationMs)
         delete[] waveData;
     }
 }
-
 
 void CALLBACK waveOutCallback(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
 {

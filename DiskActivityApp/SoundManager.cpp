@@ -21,7 +21,6 @@ struct SoundData
 };
 
 // Vector of active sounds, protected by a mutex
-static std::vector<SoundData*> g_activeSounds;
 static std::mutex g_soundMutex;
 
 void PlayBeepSoundAsync()
@@ -139,30 +138,4 @@ void GenerateToneAndPlay(double baseFrequency, double diskActivity, double maxAc
         delete[] waveData;
     }
 }
-
-void CALLBACK waveOutCallback(HWAVEOUT hwo, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
-{
-    if (uMsg == WOM_DONE)
-    {
-        OutputDebugString(L"waveOutCallback WOM_DONE received.\n");
-
-        std::lock_guard<std::mutex> lock(g_soundMutex);
-        for (auto it = g_activeSounds.begin(); it != g_activeSounds.end(); ++it)
-        {
-            SoundData* sd = *it;
-            if (sd->hWaveOut == hwo)
-            {
-                OutputDebugString(L"Cleaning up sound resources.\n");
-
-                waveOutUnprepareHeader(hwo, &sd->waveHeader, sizeof(WAVEHDR));
-                waveOutClose(hwo);
-                delete[] sd->waveData;
-                delete sd;
-                g_activeSounds.erase(it);
-                break;
-            }
-        }
-    }
-}
-
 

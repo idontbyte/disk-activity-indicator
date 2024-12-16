@@ -5,7 +5,7 @@
 // - `activityThreshold` is set to 5,000,000 bytes/sec as the default threshold.
 // - `diskActivity` is initialized to 0, meaning no activity recorded yet.
 DiskActivityMonitor::DiskActivityMonitor()
-    : hQuery(nullptr), hCounter(nullptr), activityThreshold(5000000), diskActivity(0)
+    : hQuery(nullptr), hCounter(nullptr), activityThreshold(10000000), diskActivity(0)
 {
 }
 
